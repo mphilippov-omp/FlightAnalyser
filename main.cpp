@@ -9,6 +9,9 @@
 #include <functional>
 #include <thread>
 
+#define FLIGHT_LENGTH_THRESHOLD 7
+#define FLIGHT_ID_LENGTH_THRESHOLD 5
+
 using namespace std;
 
 std::string ltrim(const std::string &s) {
@@ -26,6 +29,21 @@ std::string trim(const std::string &s) {
 string cut_first_zeros(const std::string &str) {
     int number = atoi(str.c_str());
     return to_string(number);
+}
+
+bool has_flight_id_error(const string &flight)
+{
+    if (flight.length() < 1 || flight.length() > FLIGHT_ID_LENGTH_THRESHOLD) {
+        return true;
+    }
+
+    regex pattern("^(\\d+)"); // flight id should contain only digits
+    smatch match;
+    if (!regex_search(flight, match, pattern)) {
+        return true;
+    }
+
+    return false;
 }
 
 pair<string, string> parse_flight(const string &flight) {
@@ -51,6 +69,8 @@ pair<string, string> parse_flight(const string &flight) {
         flight_id = cut_first_zeros(flight.substr(company_id.length(), flight.length() - company_id.length()));
         res.first = company_id;
         res.second = flight_id;
+    } else {
+        res.second = flight;
     }
 
     return res;
@@ -66,7 +86,27 @@ bool compare_flights(const string &first_flight, const string &second_flight)
     pair<string, string> first_flight_info = parse_flight(first_flight);
     pair<string, string> second_flight_info = parse_flight(second_flight);
 
+    if (first_flight_info.first.length() == 0
+            && first_flight_info.second.length() == 0
+            && second_flight_info.first.length() == 0
+            && second_flight_info.second.length() == 0) {
+        return false;
+    }
+
     return first_flight_info == second_flight_info;
+}
+
+bool has_flight_error(const string &flight) {
+    if (flight.length() == 0 || flight.length() == FLIGHT_LENGTH_THRESHOLD) {
+        return true;
+    }
+
+    pair<string, string> flight_info = parse_flight(flight);
+    if (has_flight_id_error(flight_info.second)) {
+        return true;
+    }
+
+    return false;
 }
 
 void analyse_flights(const string &in_file, const string &out_file)
@@ -84,9 +124,22 @@ void analyse_flights(const string &in_file, const string &out_file)
         string flight;
         getline(input_file, flight);
 
-        if (flight_registrator.size() == 0
-                || !compare_flights(flight_registrator.back(), flight)) {
-            flight_registrator.push_back(flight);
+        if (!has_flight_error(flight)) {
+            if (flight_registrator.size() == 0) {
+                flight_registrator.push_back(flight);
+            } else {
+                bool flag = false;
+                for (const auto &registered_flight : flight_registrator) {
+                    if (compare_flights(registered_flight, flight)) {
+                        flag = true;
+                        break;
+                    }
+                }
+
+                if (!flag) {
+                    flight_registrator.push_back(flight);
+                }
+            }
         }
     }
 
